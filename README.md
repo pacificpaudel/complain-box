@@ -129,4 +129,4 @@ The footer links to App Store and Google Play. To build native apps, wrap the we
 
 ## 📄 License
 
-MIT — free to use, modify, and redistribute.
+No license
