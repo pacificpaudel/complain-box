@@ -49,16 +49,34 @@ function getCurrentOrgSections() {
   return org ? (org.sections || DEFAULT_SECTIONS) : DEFAULT_SECTIONS;
 }
 
-function getOrgMembers(orgId) {
-  return state.users.filter(u => u.orgId === orgId);
-}
+// getOrgMembers — defined below with super-admin inclusion
 
 function getUserRole() {
   if (!state.currentUser) return null;
+  // Super admin always has 'super' role in any org
   if (state.currentUser.email === SUPER_ADMIN) return 'super';
   if (!state.currentOrg) return null;
-  const m = state.users.find(u => u.email === state.currentUser.email && u.orgId === state.currentOrg);
+  // Check org membership; also accept string or ObjectId match
+  const m = state.users.find(u =>
+    u.email === state.currentUser.email &&
+    (u.orgId === state.currentOrg || String(u.orgId) === String(state.currentOrg))
+  );
   return m ? m.role : null;
+}
+
+function getOrgMembers(orgId) {
+  const members = state.users.filter(u =>
+    u.orgId === orgId || String(u.orgId) === String(orgId)
+  );
+  // Always include super admin as a virtual member
+  if (state.currentUser?.email === SUPER_ADMIN) {
+    const already = members.find(m => m.email === SUPER_ADMIN);
+    if (!already) {
+      const superUser = state.users.find(u => u.email === SUPER_ADMIN);
+      if (superUser) members.unshift({ ...superUser, orgId, role: 'super' });
+    }
+  }
+  return members;
 }
 
 function isProfileComplete(user) {
@@ -73,10 +91,31 @@ function getSectionIcon(s) {
   return icons[s] || '📌';
 }
 
+// ===== NEPALI TIME =====
+const _NP_NUMS = ['०','१','२','३','४','५','६','७','८','९'];
+function toNepDigit(s) { return String(s).split('').map(d => _NP_NUMS[parseInt(d)] || d).join(''); }
+
+function getNepaliDateTime() {
+  const now = new Date();
+  // Nepal is UTC+5:45 = +345 minutes from UTC
+  const offsetMin = now.getTimezoneOffset() + 345;
+  const npt = new Date(now.getTime() + offsetMin * 60000);
+  const nepDays = ['आइतबार','सोमबार','मंगलबार','बुधबार','बिहिबार','शुक्रबार','शनिबार'];
+  const nepMonths = ['जनवरी','फेब्रुअरी','मार्च','अप्रिल','मे','जुन','जुलाई','अगस्ट','सेप्टेम्बर','अक्टोबर','नोभेम्बर','डिसेम्बर'];
+  const h = npt.getHours(), m = npt.getMinutes();
+  const period = h < 4 ? 'राति' : h < 12 ? 'बिहान' : h < 17 ? 'दिउँसो' : h < 20 ? 'साँझ' : 'राति';
+  const h12 = h % 12 || 12;
+  return `${nepDays[npt.getDay()]} ${toNepDigit(h12)}:${toNepDigit(String(m).padStart(2,'0'))} ${period} (NPT)`;
+}
+
 // ===== CLOCK =====
 function updateClock() {
   const el = document.getElementById('clock');
+  const enEl = document.getElementById('clock-en');
+  const npEl = document.getElementById('clock-np');
   if (el) el.textContent = new Date().toLocaleString();
+  if (enEl) enEl.textContent = new Date().toLocaleString('en-US', { weekday:'short', month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
+  if (npEl) npEl.textContent = getNepaliDateTime();
 }
 setInterval(updateClock, 10000);
 

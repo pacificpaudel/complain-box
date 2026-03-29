@@ -8,6 +8,7 @@ let state = {
   orgs: [],
   users: [],
   complaints: [],
+  complaintVotes: {},   // { complaintId: { up, down, myVote } }
   currentUser: null,
   currentOrg: null,
   passwordResets: [],
@@ -52,15 +53,26 @@ async function apiPut(endpoint, data) {
 // ===== PERSISTENCE =====
 async function loadState() {
   try {
-    state.orgs = await apiGet('/orgs');
-    state.users = await apiGet('/users');
-    state.complaints = await apiGet('/complaints');
-    // For currentUser and currentOrg, we might need session storage or localStorage for now
+    const [orgs, users, complaints, ipVotes] = await Promise.all([
+      apiGet('/orgs'),
+      apiGet('/users'),
+      apiGet('/complaints'),
+      apiGet('/complaints/my-ip-votes').catch(() => ({}))
+    ]);
+    state.orgs = orgs;
+    state.users = users;
+    state.complaints = complaints;
+    // Build complaintVotes from fetched data
+    state.complaintVotes = {};
+    complaints.forEach(c => {
+      const id = c._id || c.id;
+      state.complaintVotes[id] = { up: c.voteUp || 0, down: c.voteDown || 0, myVote: ipVotes[id] || 0 };
+    });
     state.currentUser = JSON.parse(localStorage.getItem('cb_currentUser') || 'null');
-    state.currentOrg = JSON.parse(localStorage.getItem('cb_currentOrg') || 'null');
-    state.passwordResets = JSON.parse(localStorage.getItem('cb_resets') || '[]');
-    state.deletedComplaints = JSON.parse(localStorage.getItem('cb_deleted') || '[]');
-    state.usedPhotos = JSON.parse(localStorage.getItem('cb_photos') || '[]');
+    state.currentOrg  = JSON.parse(localStorage.getItem('cb_currentOrg')  || 'null');
+    state.passwordResets   = JSON.parse(localStorage.getItem('cb_resets')  || '[]');
+    state.deletedComplaints= JSON.parse(localStorage.getItem('cb_deleted') || '[]');
+    state.usedPhotos       = JSON.parse(localStorage.getItem('cb_photos')  || '[]');
   } catch (error) {
     console.error('Failed to load state from API:', error);
   }

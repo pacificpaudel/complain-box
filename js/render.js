@@ -8,9 +8,11 @@ function render() {
 function buildApp() {
   if (currentPage === 'org-select') return buildOrgSelect();
   if (currentPage === 'action-plans') return buildActionPlansLayout();
+  const cookieAccepted = localStorage.getItem('cb_cookies');
   return `
     ${buildTopBar()}
     ${buildOrgBar()}
+    ${buildCoverBanner()}
     <div id="main">
       ${buildSidebar()}
       <div id="content">${buildContent()}</div>
@@ -18,6 +20,7 @@ function buildApp() {
     </div>
     ${buildFooter()}
     ${currentModal ? buildModal() : ''}
+    ${!cookieAccepted ? buildCookieConsent() : ''}
   `;
 }
 
@@ -62,9 +65,15 @@ function buildTopBar() {
       ${customLogo
         ? `<img src="${customLogo}" class="logo-icon-custom" alt="Logo">`
         : `<div class="logo-icon">📬</div>`}
-      <span>Complaint Box</span>
+      <div class="brand-names">
+        <span class="brand-en">Complain-Box</span>
+        <span class="brand-ne">गुनासो पेटिका</span>
+      </div>
     </div>
-    <div class="datetime" id="clock">${new Date().toLocaleString()}</div>
+    <div class="clock-block">
+      <div class="clock-np" id="clock-np">${getNepaliDateTime()}</div>
+      <div class="clock-en" id="clock-en">${new Date().toLocaleString('en-US',{weekday:'short',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})}</div>
+    </div>
   </div>`;
 }
 
@@ -95,6 +104,37 @@ function buildOrgBar() {
         <button onclick="openModal('login')">Login</button>
         <button class="primary" onclick="openModal('register')">Sign Up</button>
       `}
+    </div>
+  </div>`;
+}
+
+// ===== COVER BANNER =====
+function buildCoverBanner() {
+  if (!state.currentOrg) return '';
+  const coverId = `cb_cover_${state.currentOrg}`;
+  const coverImg = localStorage.getItem(coverId);
+  if (!coverImg) return '<div id="cover-banner-empty"></div>';
+  return `
+  <div id="cover-banner">
+    <img src="${coverImg}" alt="Cover" id="cover-img">
+    <div class="cover-overlay"></div>
+  </div>`;
+}
+
+// ===== COOKIE CONSENT =====
+function buildCookieConsent() {
+  return `
+  <div id="cookie-banner">
+    <div class="cookie-icon">🍪</div>
+    <div class="cookie-text">
+      <strong>We use cookies</strong> to enhance your experience. By continuing, you agree to our
+      <span class="cookie-link" onclick="openModal('cookies')">Cookie Policy</span>,
+      <span class="cookie-link" onclick="openModal('privacy')">Privacy Policy</span> and
+      <span class="cookie-link" onclick="openModal('terms')">Terms of Service</span>.
+    </div>
+    <div class="cookie-actions">
+      <button class="btn btn-primary btn-sm" onclick="acceptCookies()">Accept All</button>
+      <button class="btn btn-secondary btn-sm" onclick="declineCookies()">Decline</button>
     </div>
   </div>`;
 }
