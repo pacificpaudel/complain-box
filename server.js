@@ -23,6 +23,7 @@ mongoose.connect(process.env.MONGODB_URI, {
 app.use('/api/orgs', require('./routes/orgs'));
 app.use('/api/users', require('./routes/users'));
 app.use('/api/complaints', require('./routes/complaints'));
+app.use('/api/action-plans', require('./routes/actionPlans'));
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);

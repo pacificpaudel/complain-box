@@ -7,6 +7,7 @@ function render() {
 
 function buildApp() {
   if (currentPage === 'org-select') return buildOrgSelect();
+  if (currentPage === 'action-plans') return buildActionPlansLayout();
   return `
     ${buildTopBar()}
     ${buildOrgBar()}
@@ -54,10 +55,13 @@ function buildOrgSelect() {
 
 // ===== TOP BAR =====
 function buildTopBar() {
+  const customLogo = localStorage.getItem('cb_brand_logo');
   return `
   <div id="top-bar">
     <div class="brand">
-      <div class="logo-icon">📬</div>
+      ${customLogo
+        ? `<img src="${customLogo}" class="logo-icon-custom" alt="Logo">`
+        : `<div class="logo-icon">📬</div>`}
       <span>Complaint Box</span>
     </div>
     <div class="datetime" id="clock">${new Date().toLocaleString()}</div>
@@ -83,6 +87,7 @@ function buildOrgBar() {
     <div class="user-actions">
       ${state.currentUser ? `
         <button onclick="currentPage='org-select';render()">🏠 Orgs</button>
+        <button class="ap-menu-btn" onclick="currentPage='action-plans';loadAPData().then(()=>render())">🇳🇵 Action Plans</button>
         <button onclick="openModal('profile')">👤 ${state.currentUser.name || 'Profile'}</button>
         ${(role === 'admin' || role === 'super') ? `<button onclick="currentPage='admin';render()">⚙️ Admin</button>` : ''}
         <button onclick="logoutUser()">Logout</button>
@@ -124,6 +129,13 @@ function buildSidebar() {
           <span class="icon">${getSectionIcon(s)}</span> ${s} <span class="count">${cnt}</span>
         </div>`;
       }).join('')}
+    </div>
+    <hr>
+    <div class="sidebar-section">
+      <div class="sidebar-section-title">Government</div>
+      <div class="sidebar-item ${currentPage==='action-plans'?'active':''}" onclick="currentPage='action-plans';loadAPData().then(()=>render())">
+        <span class="icon">🇳🇵</span> Action Plans <span class="count">${AP_ITEMS.filter(i=>i.status==='completed').length}✓</span>
+      </div>
     </div>
     ${state.currentUser ? `
     <hr>
@@ -328,6 +340,7 @@ function buildAdminPage() {
     <button class="tab" onclick="switchAdminTab(event,'tab-members')">Members</button>
     <button class="tab" onclick="switchAdminTab(event,'tab-sections')">Sections</button>
     <button class="tab" onclick="switchAdminTab(event,'tab-complaints')">Complaints</button>
+    ${role === 'super' ? `<button class="tab tab-super" onclick="switchAdminTab(event,'tab-superadmin')">⚡ Super Admin</button>` : ''}
   </div>
   <div id="tab-org">
     <div class="profile-card">
@@ -406,6 +419,74 @@ function buildAdminPage() {
         <button class="btn btn-sm btn-secondary" onclick="viewComplaint('${c.id}')">View</button>
       </div>
     </div>`).join('')}
+  </div>
+  ${role === 'super' ? buildSuperAdminTab() : ''}
+  `;
+}
+
+function buildSuperAdminTab() {
+  const customLogo = localStorage.getItem('cb_brand_logo');
+  const apVoteCount = Object.values(apVotes || {}).reduce((sum, v) => sum + (v.up||0) + (v.down||0), 0);
+  return `
+  <div id="tab-superadmin" style="display:none">
+    <div class="super-admin-grid">
+
+      <!-- Complaint Box Branding -->
+      <div class="super-admin-card">
+        <div class="super-admin-card-title">🎨 Complaint Box Brand Logo</div>
+        <div class="super-admin-card-body">
+          <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px;">
+            <div style="text-align:center;">
+              <div style="font-size:11px;color:var(--text3);margin-bottom:6px;">Current Logo</div>
+              ${customLogo
+                ? `<img src="${customLogo}" style="width:56px;height:56px;border-radius:10px;object-fit:cover;border:2px solid var(--accent);">`
+                : `<div style="width:56px;height:56px;background:var(--accent);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:26px;">📬</div>`}
+            </div>
+            <div style="flex:1">
+              <div class="file-upload-zone" onclick="document.getElementById('brandLogoInput').click()" style="padding:12px;">
+                <input type="file" id="brandLogoInput" accept="image/*" onchange="handleBrandLogo(event)" style="display:none">
+                📷 Upload new logo
+              </div>
+              <div class="form-hint" style="margin-top:6px;">PNG/JPG · Shows in the top bar brand</div>
+            </div>
+          </div>
+          ${customLogo ? `<button class="btn btn-danger btn-sm" onclick="removeBrandLogo()">Remove Custom Logo</button>` : ''}
+        </div>
+      </div>
+
+      <!-- Action Plan Votes Reset -->
+      <div class="super-admin-card">
+        <div class="super-admin-card-title">🗳️ Action Plan Votes</div>
+        <div class="super-admin-card-body">
+          <div class="super-stat-row">
+            <div class="super-stat"><span>${apVoteCount}</span><label>Total Votes Cast</label></div>
+            <div class="super-stat"><span>${Object.keys(apVotes||{}).length}</span><label>Items Voted On</label></div>
+          </div>
+          <div style="margin-top:14px;padding:12px;background:rgba(224,90,90,0.06);border:1px solid rgba(224,90,90,0.2);border-radius:var(--radius);">
+            <div style="font-size:12px;color:var(--text2);margin-bottom:10px;">⚠️ This will permanently delete all upvotes and downvotes for all 100 action plan items. This action cannot be undone.</div>
+            <button class="btn btn-danger" onclick="resetActionPlanVotes()">🗑️ Reset All Votes</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- IP Voting Status -->
+      <div class="super-admin-card">
+        <div class="super-admin-card-title">🌐 IP-Based Voting</div>
+        <div class="super-admin-card-body">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+            <div style="width:10px;height:10px;border-radius:50%;background:var(--green);box-shadow:0 0 6px var(--green);"></div>
+            <span style="font-size:13px;color:var(--text2);">Active — 1 vote per IP per item</span>
+          </div>
+          <div style="font-size:12px;color:var(--text3);line-height:1.6;">
+            Each IP address can cast one vote per action item. Voting from a different account on the same network will be blocked. Users can change their vote (up↔down) but cannot cast a second vote.
+          </div>
+          <div style="margin-top:12px;padding:10px;background:var(--surface2);border-radius:var(--radius);font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;">
+            Enforcement: server-side · Storage: MongoDB · Scope: per-item
+          </div>
+        </div>
+      </div>
+
+    </div>
   </div>`;
 }
 

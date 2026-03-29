@@ -148,8 +148,6 @@ async function doCreateOrg() {
     notify('Failed to create organization', 'error');
   }
 }
-  saveState(state); closeModal(); notify(`Organization "${name}" created!`, 'success'); render();
-}
 
 function saveOrgSettings() {
   const org = state.orgs.find(o => o.id === state.currentOrg);
@@ -324,8 +322,54 @@ function renderModal() {
 function switchAdminTab(e, tabId) {
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   e.target.classList.add('active');
-  ['tab-org', 'tab-members', 'tab-sections', 'tab-complaints'].forEach(id => {
+  ['tab-org', 'tab-members', 'tab-sections', 'tab-complaints', 'tab-superadmin'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.style.display = id === tabId ? 'block' : 'none';
   });
+}
+
+// ===== SUPER ADMIN ACTIONS =====
+
+function handleBrandLogo(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  if (file.size > 500 * 1024) { notify('Image must be under 500KB', 'error'); return; }
+  const reader = new FileReader();
+  reader.onload = e => {
+    localStorage.setItem('cb_brand_logo', e.target.result);
+    notify('Brand logo updated', 'success');
+    render();
+  };
+  reader.readAsDataURL(file);
+}
+
+function removeBrandLogo() {
+  localStorage.removeItem('cb_brand_logo');
+  notify('Custom logo removed', 'success');
+  render();
+}
+
+async function resetActionPlanVotes() {
+  if (!state.currentUser || state.currentUser.email !== SUPER_ADMIN) {
+    notify('Super admin only', 'error'); return;
+  }
+  if (!confirm('Reset ALL votes for all 100 action plan items? This cannot be undone.')) return;
+  try {
+    const res = await fetch(`${API_BASE}/action-plans/votes/reset`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ adminEmail: state.currentUser.email })
+    });
+    const data = await res.json();
+    if (res.ok) {
+      apVotes = {};
+      apIpVotes = {};
+      notify(`Votes reset — ${data.deleted} vote records deleted`, 'success');
+      render();
+    } else {
+      notify('Reset failed: ' + data.error, 'error');
+    }
+  } catch(e) {
+    notify('Reset failed', 'error');
+  }
 }
