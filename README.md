@@ -18,9 +18,7 @@ A multi-tenant complaint management platform with AI-powered duplicate detection
 
 3. Open `index.html` in any modern browser.
 
-**Super Admin login**
-- Email: `praspaudel@gmail.com`
-- Password: `superadmin123`
+
 
 > Data is now persisted in MongoDB Atlas instead of localStorage.
 
